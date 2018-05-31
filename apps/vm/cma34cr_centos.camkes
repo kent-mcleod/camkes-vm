@@ -39,6 +39,7 @@ import <StringReverse/StringReverse.camkes>;
 import <UDPServer/UDPServer.camkes>;
 import <HelloWorld/HelloWorld.camkes>;
 import <Firewall/Firewall.camkes>;
+import <EthAdapter/EthAdapter.camkes>;
 
 component VM {
     composition {
@@ -66,12 +67,18 @@ component VM {
         component Ethdriver82574 ethdriver;
         component HWEthDriver82574 HWEthdriver;
         component Firewall firewall;
+        component EthAdapter ethadapter;
         /* Hardware resources for the ethernet driver */
         connection seL4HardwareMMIO ethdrivermmio(from ethdriver.EthDriver, to HWEthdriver.mmio);
         connection seL4HardwareInterrupt hwethirq(from HWEthdriver.irq, to ethdriver.irq);
 
         /* Connect vm0 ethernet to the firewall */
-        connection seL4Ethdriver firewall_con(from vm0.ethdriver, to firewall.client);
+        connection seL4Ethdriver firewall_con(from vm0.ethdriver, to ethdriver.client);
+        connection seL4Ethdriver adapter_con_a(from ethadapter.a, to firewall.client);
+        connection seL4Ethdriver adapter_con_b(from ethadapter.b, to ethdriver.client);
+        connection seL4GlobalAsynchCallback adapter_global_callback_a(from ethadapter.dummy_a, to ethadapter.a_has_data);
+        connection seL4GlobalAsynchCallback adapter_global_callback_b(from ethadapter.dummy_b, to ethadapter.b_has_data);
+
         /* Connect the firewall to the ethdriver */
         connection seL4Ethdriver ethdriver_con(from firewall.ethdriver, to ethdriver.client);
         /* Setup the firewall's global endpoint callback */
@@ -124,16 +131,27 @@ component VM {
         HWEthdriver.irq_irq_ioapic_pin = 18;
         HWEthdriver.irq_irq_vector = 18;
 
-        vm0.ethdriver_attributes = "1";
+        vm0.ethdriver_attributes = "3"; // This is a client id for the ethdriver component interface
         vm0.ethdriver_global_endpoint = "vm0";
         vm0.ethdriver_badge = "134479872";
-        vm0.ethdriver_mac = [6, 0, 0, 11, 12, 13];
+        vm0.ethdriver_mac = [6, 0, 0, 11, 12, 14];
 
-        firewall.ethdriver_attributes = "1";
+        firewall.ethdriver_attributes = "1"; // This is a client id for the ethdriver component interface
         firewall.ethdriver_global_endpoint = "firewall";
         firewall.ethdriver_badge = "134217729";
         firewall.ethdriver_mac = [6, 0, 0, 11, 12, 13];
         firewall.ethdriver_has_data_global_endpoint = "firewall";
+
+        ethadapter.a_attributes = "1"; // This is the client id for the firewall component interface
+        ethadapter.b_attributes = "2"; // This is the client id for the ethdriver component interface
+        ethadapter.a_mac = [6, 0, 0, 11, 12, 13];
+        ethadapter.b_mac = [6, 0, 0, 11, 12, 15];
+
+        ethadapter.a_global_endpoint = "etha";
+        ethadapter.a_has_data_global_endpoint = "etha";
+        ethadapter.b_global_endpoint = "ethb";
+        ethadapter.b_has_data_global_endpoint = "ethb";
+
 #endif
 
 #ifndef PASSTHROUGH_SATA
